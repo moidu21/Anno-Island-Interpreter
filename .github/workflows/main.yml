@@ -6,14 +6,22 @@ on:
       - main
     tags:
       - "v*"
+      - "[0-9]*"
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag de la release à mettre à jour, exemple: 1.0 ou v1.0.0. Laisse vide pour ne pas publier dans Releases."
+        required: false
+        type: string
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+permissions:
+  contents: write
 
 jobs:
   build-windows:
     runs-on: windows-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout repository
@@ -60,8 +68,28 @@ jobs:
 
           Compress-Archive -Path release\* -DestinationPath "Anno-Island-Interpreter-Windows.zip" -Force
 
-      - name: Upload release ZIP
+      - name: Upload workflow artifact
         uses: actions/upload-artifact@v6
         with:
           name: Anno-Island-Interpreter-Windows
           path: Anno-Island-Interpreter-Windows.zip
+
+      - name: Decide release tag
+        id: release_tag
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${{ github.event.inputs.release_tag }}" ]]; then
+            echo "tag=${{ github.event.inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload ZIP to GitHub Release
+        if: steps.release_tag.outputs.tag != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ steps.release_tag.outputs.tag }}" "Anno-Island-Interpreter-Windows.zip" --clobber
