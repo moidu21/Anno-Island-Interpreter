@@ -1,0 +1,64 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        shell: powershell
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+
+          if (Test-Path "requirements.txt") {
+            pip install -r requirements.txt
+          }
+
+      - name: Build executable
+        shell: powershell
+        run: |
+          powershell -ExecutionPolicy Bypass -File .\build_exe_interpreter.ps1
+
+      - name: Package release files
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path release
+
+          Copy-Item "dist\Anno Island Interpreter.exe" "release\Anno Island Interpreter.exe"
+
+          if (Test-Path "README_FR_ISLAND_INTERPRETER.md") {
+            Copy-Item "README_FR_ISLAND_INTERPRETER.md" "release\README_FR_ISLAND_INTERPRETER.md"
+          }
+
+          if (Test-Path "README_EN_ISLAND_INTERPRETER.md") {
+            Copy-Item "README_EN_ISLAND_INTERPRETER.md" "release\README_EN_ISLAND_INTERPRETER.md"
+          }
+
+          if (Test-Path "README_GER_ISLAND_INTERPRETER.md") {
+            Copy-Item "README_GER_ISLAND_INTERPRETER.md" "release\README_GER_ISLAND_INTERPRETER.md"
+          }
+
+          Compress-Archive -Path release\* -DestinationPath "Anno-Island-Interpreter-Windows.zip" -Force
+
+      - name: Upload release ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Anno-Island-Interpreter-Windows
+          path: Anno-Island-Interpreter-Windows.zip
